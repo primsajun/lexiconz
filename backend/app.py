@@ -21,9 +21,8 @@ app.include_router(router, prefix="/api")
 if not os.getenv("VERCEL"):
     # Mount uploads folder to serve local PDFs during local development.
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-# Serve the frontend from the same app in both local development and Vercel.
-app.mount("/", StaticFiles(directory="public", html=True), name="public")
+    # Serve the frontend locally from the same app
+    app.mount("/", StaticFiles(directory="public", html=True), name="public")
 
 if __name__ == "__main__":
     import uvicorn
