@@ -23,7 +23,7 @@ if not os.getenv("VERCEL"):
     app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Serve the frontend from the same app in both local development and Vercel.
-app.mount("/", StaticFiles(directory="frontend", html=True), name="frontend")
+app.mount("/", StaticFiles(directory="public", html=True), name="public")
 
 if __name__ == "__main__":
     import uvicorn
