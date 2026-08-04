@@ -16,20 +16,54 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, 'public/uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
+const upload = multer({ storage: multer.memoryStorage() });
+const historyStorePath = path.join(__dirname, 'data', 'history.json');
+if (!fs.existsSync(path.dirname(historyStorePath))) {
+    fs.mkdirSync(path.dirname(historyStorePath), { recursive: true });
 }
 
-const upload = multer({ dest: 'public/uploads/' });
+function readHistoryStore() {
+    try {
+        if (!fs.existsSync(historyStorePath)) return [];
+        const raw = fs.readFileSync(historyStorePath, 'utf8');
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function writeHistoryStore(items) {
+    fs.writeFileSync(historyStorePath, JSON.stringify(items, null, 2));
+}
+
+function upsertHistoryStore(userId, record) {
+    const items = readHistoryStore();
+    const existingIndex = items.findIndex(item => item.user_id === userId && item.pdf_id === record.pdf_id);
+    if (existingIndex >= 0) {
+        items[existingIndex] = { ...items[existingIndex], ...record, last_accessed: new Date().toISOString() };
+    } else {
+        items.unshift({ ...record, user_id: userId, last_accessed: new Date().toISOString() });
+    }
+    writeHistoryStore(items);
+    return items;
+}
+
+function deleteHistoryStore(userId, id) {
+    const items = readHistoryStore().filter(item => !(item.user_id === userId && item.id === id));
+    writeHistoryStore(items);
+    return items;
+}
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
+);
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Config
@@ -99,21 +133,30 @@ app.get('/api/tts/:word', async (req, res) => {
     }
 });
 
-// Local File Upload
+// Supabase Storage Upload
 app.post('/api/upload', upload.single('pdf'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    
-    const safeName = Date.now() + "_" + req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
-    const targetPath = path.join(uploadsDir, safeName);
-    fs.renameSync(req.file.path, targetPath);
-    
-    const publicUrl = `/uploads/${safeName}`;
-    
-    // Save record to DB
+
+    const safeName = `${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('pdfs')
+        .upload(safeName, req.file.buffer, {
+            contentType: req.file.mimetype || 'application/pdf',
+            upsert: false
+        });
+
+    if (uploadError) {
+        return res.status(500).json({ error: uploadError.message });
+    }
+
+    const { data: publicData } = supabase.storage.from('pdfs').getPublicUrl(safeName);
+    const publicUrl = publicData.publicUrl;
+
     const { data, error } = await supabase.from('pdfs').insert([{ title: req.file.originalname, file_url: publicUrl }]);
     if (error) return res.status(500).json({ error: error.message });
-    
-    res.json({ status: "success", url: publicUrl, filename: req.file.originalname, data });
+
+    res.json({ status: "success", url: publicUrl, filename: req.file.originalname, data, storagePath: uploadData?.path });
 });
 
 // Auth Register
@@ -140,26 +183,35 @@ app.post('/api/auth/login', upload.none(), async (req, res) => {
 app.get('/api/history', async (req, res) => {
     const { user_id } = req.query;
     if (!user_id) return res.status(400).json({ error: "Missing user_id" });
-    
-    const { data, error } = await supabase.from('reading_history').select('*').eq('user_id', user_id).order('last_accessed', { ascending: false });
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data || [] });
+
+    const localItems = readHistoryStore()
+        .filter(item => item.user_id === user_id)
+        .sort((a, b) => new Date(b.last_accessed) - new Date(a.last_accessed));
+
+    res.json({ data: localItems });
 });
 
 // History POST
 app.post('/api/history', upload.none(), async (req, res) => {
-    const { user_id, title, file_url, last_page } = req.body;
-    if (!user_id || !file_url) return res.status(400).json({ error: "Missing parameters" });
-    
-    const { data: existing } = await supabase.from('reading_history').select('*').eq('user_id', user_id).eq('file_url', file_url).single();
-    let result;
-    if (existing) {
-        result = await supabase.from('reading_history').update({ last_page: parseInt(last_page), last_accessed: new Date().toISOString() }).eq('id', existing.id);
-    } else {
-        result = await supabase.from('reading_history').insert([{ user_id, title, file_url, last_page: parseInt(last_page) }]);
-    }
-    if (result.error) return res.status(400).json({ error: result.error.message });
-    res.json({ status: "success" });
+    const { user_id, pdf_id, title, file_url, last_page } = req.body;
+    if (!user_id || !pdf_id || !file_url) return res.status(400).json({ error: "Missing parameters" });
+
+    const safeUserId = String(user_id);
+    const safePdfId = String(pdf_id || '').trim() || `pdf-${Date.now()}`;
+    const safeTitle = String(title || safePdfId).trim();
+    const safeFileUrl = String(file_url).trim();
+    const record = {
+        id: `local-${Date.now()}`,
+        user_id: safeUserId,
+        pdf_id: safePdfId,
+        title: safeTitle,
+        file_url: safeFileUrl,
+        last_page: parseInt(last_page, 10) || 1,
+        last_accessed: new Date().toISOString()
+    };
+
+    upsertHistoryStore(safeUserId, record);
+    res.json({ status: "success", source: 'local' });
 });
 
 // History DELETE
@@ -167,10 +219,9 @@ app.delete('/api/history/:id', async (req, res) => {
     const { id } = req.params;
     const { user_id } = req.query;
     if (!id || !user_id) return res.status(400).json({ error: "Missing parameters" });
-    
-    const { error } = await supabase.from('reading_history').delete().eq('id', id).eq('user_id', user_id);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ status: "success" });
+
+    deleteHistoryStore(user_id, id);
+    res.json({ status: "success", source: 'local' });
 });
 
 // Vocabulary GET
