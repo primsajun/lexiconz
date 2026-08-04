@@ -15,8 +15,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routes
+# Include API routes (both with and without /api prefix for Vercel compatibility)
 app.include_router(router, prefix="/api")
+app.include_router(router)
 
 if not os.getenv("VERCEL"):
     # Mount uploads folder to serve local PDFs during local development.
