@@ -10,50 +10,13 @@ import { fileURLToPath } from 'url';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const _filename = fileURLToPath(import.meta.url);
+const _dirname = path.dirname(_filename);
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 const upload = multer({ storage: multer.memoryStorage() });
-const historyStorePath = path.join(__dirname, 'data', 'history.json');
-if (!fs.existsSync(path.dirname(historyStorePath))) {
-    fs.mkdirSync(path.dirname(historyStorePath), { recursive: true });
-}
-
-function readHistoryStore() {
-    try {
-        if (!fs.existsSync(historyStorePath)) return [];
-        const raw = fs.readFileSync(historyStorePath, 'utf8');
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (error) {
-        return [];
-    }
-}
-
-function writeHistoryStore(items) {
-    fs.writeFileSync(historyStorePath, JSON.stringify(items, null, 2));
-}
-
-function upsertHistoryStore(userId, record) {
-    const items = readHistoryStore();
-    const existingIndex = items.findIndex(item => item.user_id === userId && item.pdf_id === record.pdf_id);
-    if (existingIndex >= 0) {
-        items[existingIndex] = { ...items[existingIndex], ...record, last_accessed: new Date().toISOString() };
-    } else {
-        items.unshift({ ...record, user_id: userId, last_accessed: new Date().toISOString() });
-    }
-    writeHistoryStore(items);
-    return items;
-}
-
-function deleteHistoryStore(userId, id) {
-    const items = readHistoryStore().filter(item => !(item.user_id === userId && item.id === id));
-    writeHistoryStore(items);
-    return items;
-}
 
 app.use(cors());
 app.use(express.json());
