@@ -198,7 +198,11 @@ app.delete('/api/vocabulary/:id', async (req, res) => {
     res.json({ status: "success" });
 });
 
-// Start Server
-app.listen(port, () => {
-    console.log(`\n🚀 Server is running at http://localhost:${port}\n`);
-});
+// Start Server (only if not running in serverless environment)
+if (process.env.NODE_ENV !== 'production' && !process.env.NETLIFY) {
+    app.listen(port, () => {
+        console.log(`🚀 Server is running at http://localhost:${port}`);
+    });
+}
+
+export default app;
