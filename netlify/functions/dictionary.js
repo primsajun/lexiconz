@@ -1,8 +1,11 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export default async function handler(req, res) {
-    const { word } = req.query;
-    if (!word) return res.status(400).json({ error: "Word is required" });
+export default async (req, context) => {
+    const word = context.params.word;
+    
+    if (!word) {
+        return new Response(JSON.stringify({ error: "Word is required" }), { status: 400 });
+    }
 
     try {
         const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -15,10 +18,16 @@ export default async function handler(req, res) {
         
         text = text.replace(/```json/g, "").replace(/```/g, "").trim();
         
-        const data = JSON.parse(text);
-        res.status(200).json(data);
+        return new Response(text, {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+        });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ error: error.message });
+        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
-}
+};
+
+export const config = {
+    path: "/api/dictionary/:word"
+};
