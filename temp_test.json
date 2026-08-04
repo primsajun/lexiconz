@@ -1,0 +1,67 @@
+[
+  [
+    [
+      null,
+      null,
+      null,
+      "h\u0259\u02c8l\u014d"
+    ]
+  ],
+  null,
+  "en",
+  null,
+  null,
+  null,
+  1,
+  [],
+  [
+    [
+      "en"
+    ],
+    null,
+    [
+      1
+    ],
+    [
+      "en"
+    ]
+  ],
+  null,
+  null,
+  null,
+  [
+    [
+      "exclamation",
+      [
+        [
+          "used as a greeting or to begin a phone conversation.",
+          "m_en_gbus0460730.012"
+        ]
+      ],
+      "hello",
+      17
+    ],
+    [
+      "noun",
+      [
+        [
+          "an utterance of \u201chello\u201d; a greeting.",
+          "m_en_gbus0460730.025"
+        ]
+      ],
+      "hello",
+      1
+    ],
+    [
+      "verb",
+      [
+        [
+          "say or shout \u201chello\u201d; greet someone.",
+          "m_en_gbus0460730.034"
+        ]
+      ],
+      "hello",
+      2
+    ]
+  ]
+]

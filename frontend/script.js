@@ -1,0 +1,535 @@
+const API_BASE = "http://localhost:8000/api";
+let currentPdfId = "";
+let currentPdfText = ""; // For basic context to AI
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(err => console.log('ServiceWorker registration failed: ', err));
+    });
+}
+
+// --- Reader Logic (reader.html) ---
+const pdfViewer = document.getElementById('pdfViewer');
+if (pdfViewer) {
+    let pdfDoc = null,
+        pageNum = 1,
+        pageRendering = false,
+        pageNumPending = null,
+        scale = window.innerWidth <= 768 ? 0.75 : 1.0, // 75% on mobile, 100% on desktop
+        canvas = document.getElementById('pdfRenderCanvas'),
+        ctx = canvas.getContext('2d'),
+        textLayerDiv = document.getElementById('textLayer');
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let pdfUrl = urlParams.get('pdfUrl');
+    currentPdfId = urlParams.get('pdfId');
+    const initialPage = urlParams.get('page');
+    const forceHome = urlParams.get('home');
+
+    if (!pdfUrl && !forceHome) {
+        pdfUrl = localStorage.getItem('lastPdfUrl');
+        currentPdfId = localStorage.getItem('lastPdfId') || "unknown";
+    } else if (forceHome && !localStorage.getItem('user_id')) {
+        // Clear history if forcing home while not logged in
+        localStorage.removeItem('lastPdfUrl');
+        localStorage.removeItem('lastPdfId');
+    } else {
+        currentPdfId = currentPdfId || "unknown";
+    }
+
+    function loadPDF(url, id) {
+        // Remove ?home=true from URL so refresh doesn't force the home page
+        const currentUrl = new URL(window.location.href);
+        if (currentUrl.searchParams.has('home')) {
+            currentUrl.searchParams.delete('home');
+            window.history.replaceState({}, document.title, currentUrl.pathname + currentUrl.search);
+        }
+
+        document.getElementById('pdfLoadingOverlay').classList.remove('hidden');
+        currentPdfId = id || "unknown";
+        localStorage.setItem('lastPdfUrl', url);
+        localStorage.setItem('lastPdfId', currentPdfId);
+        
+        const fetchUrl = url.startsWith('/') ? `http://localhost:8000${url}` : url;
+        
+        pdfjsLib.getDocument(fetchUrl).promise.then(function(pdfDoc_) {
+            pdfDoc = pdfDoc_;
+            const storedPage = localStorage.getItem('lastPageNum');
+            pageNum = initialPage ? parseInt(initialPage) : (storedPage ? parseInt(storedPage) : 1);
+            if (pageNum > pdfDoc.numPages) pageNum = pdfDoc.numPages;
+            document.getElementById('pageCount').textContent = pdfDoc.numPages;
+            renderPage(pageNum);
+        }).catch(err => {
+            console.error(err);
+            alert("Error loading PDF");
+        });
+    }
+
+    const landingView = document.getElementById('landingView');
+    const readerView = document.getElementById('readerView');
+
+    if (pdfUrl) {
+        if (landingView) landingView.classList.add('hidden');
+        if (readerView) readerView.style.display = 'flex';
+        loadPDF(pdfUrl, currentPdfId);
+    } else {
+        if (landingView) landingView.classList.remove('hidden');
+        if (readerView) readerView.style.display = 'none';
+        // Fallback for canvas if it somehow shows
+        ctx.font = "20px Arial";
+        ctx.fillStyle = "white";
+        ctx.fillText("Upload a PDF to start reading...", 50, 100);
+    }
+
+    // Landing Page Upload Logic
+    const landingUploadBtn = document.getElementById('landingUploadBtn');
+    const landingPdfInput = document.getElementById('landingPdfInput');
+    
+    if (landingUploadBtn && landingPdfInput) {
+        landingUploadBtn.addEventListener('click', () => {
+            landingPdfInput.click();
+        });
+
+        landingPdfInput.addEventListener('change', async (e) => {
+            if (e.target.files.length === 0) return;
+            const file = e.target.files[0];
+            
+            if (landingView) landingView.classList.add('hidden');
+            if (readerView) readerView.style.display = 'flex';
+            document.getElementById('pdfLoadingOverlay').classList.remove('hidden');
+            
+            const formData = new FormData();
+            formData.append("file", file);
+            
+            landingUploadBtn.textContent = "Uploading...";
+            landingUploadBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.url) {
+                    loadPDF(data.url, data.filename);
+                }
+            } catch (error) {
+                console.error("Upload failed", error);
+                alert("Upload failed. Please check backend server.");
+                if (landingView) landingView.classList.remove('hidden');
+                if (readerView) readerView.style.display = 'none';
+            } finally {
+                landingUploadBtn.textContent = "Select PDF File";
+                landingUploadBtn.disabled = false;
+            }
+        });
+    }
+
+    // Nav Upload Logic
+    const navUploadBtn = document.getElementById('navUploadBtn');
+    const navPdfInput = document.getElementById('navPdfInput');
+    
+    if (navUploadBtn && navPdfInput) {
+        navUploadBtn.addEventListener('click', () => {
+            navPdfInput.click();
+        });
+
+        navPdfInput.addEventListener('change', async (e) => {
+            if (e.target.files.length === 0) return;
+            const file = e.target.files[0];
+            document.getElementById('pdfLoadingOverlay').classList.remove('hidden');
+            const formData = new FormData();
+            formData.append("file", file);
+            
+            navUploadBtn.textContent = "Uploading...";
+            navUploadBtn.disabled = true;
+
+            try {
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: "POST",
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.url) {
+                    loadPDF(data.url, data.filename);
+                }
+            } catch (error) {
+                console.error("Upload failed", error);
+                alert("Upload failed. Please check backend server.");
+            } finally {
+                navUploadBtn.textContent = "Upload PDF";
+                navUploadBtn.disabled = false;
+            }
+        });
+    }
+
+    function renderPage(num) {
+        pageRendering = true;
+        localStorage.setItem('lastPageNum', num);
+        
+        // Sync history debounce
+        if (typeof historySyncTimeout !== 'undefined') clearTimeout(historySyncTimeout);
+        historySyncTimeout = setTimeout(() => {
+            syncHistory(num);
+        }, 1500);
+        
+        // Update Zoom Label
+        const zoomLabel = document.getElementById('zoomLevel');
+        if (zoomLabel) {
+            zoomLabel.textContent = Math.round(scale * 100) + '%';
+        }
+
+        pdfDoc.getPage(num).then(function(page) {
+            const viewport = page.getViewport({scale: scale});
+            
+            // Fix blurriness on high-DPI screens
+            const outputScale = window.devicePixelRatio || 1;
+            canvas.width = Math.floor(viewport.width * outputScale);
+            canvas.height = Math.floor(viewport.height * outputScale);
+            canvas.style.width = Math.floor(viewport.width) + "px";
+            canvas.style.height =  Math.floor(viewport.height) + "px";
+            
+            const transform = outputScale !== 1 
+              ? [outputScale, 0, 0, outputScale, 0, 0] 
+              : null;
+            
+            textLayerDiv.style.width = viewport.width + 'px';
+            textLayerDiv.style.height = viewport.height + 'px';
+            textLayerDiv.style.setProperty('--scale-factor', viewport.scale);
+
+            const renderContext = {
+                canvasContext: ctx,
+                transform: transform,
+                viewport: viewport
+            };
+            const renderTask = page.render(renderContext);
+
+            renderTask.promise.then(function() {
+                pageRendering = false;
+                document.getElementById('pdfLoadingOverlay').classList.add('hidden');
+                if (pageNumPending !== null) {
+                    renderPage(pageNumPending);
+                    pageNumPending = null;
+                }
+                // Render text layer for selection
+                return page.getTextContent();
+            }).then(function(textContent) {
+                textLayerDiv.innerHTML = ''; // clear
+                // Extract simple text for AI context
+                currentPdfText = textContent.items.map(s => s.str).join(' ');
+                
+                pdfjsLib.renderTextLayer({
+                    textContent: textContent,
+                    container: textLayerDiv,
+                    viewport: viewport,
+                    textDivs: []
+                });
+            });
+        });
+        document.getElementById('pageNum').textContent = num;
+    }
+
+    function queueRenderPage(num) {
+        if (pageRendering) {
+            pageNumPending = num;
+        } else {
+            renderPage(num);
+        }
+    }
+
+    document.getElementById('prevBtn').addEventListener('click', () => {
+        if (pageNum <= 1) return;
+        pageNum--;
+        queueRenderPage(pageNum);
+    });
+
+    document.getElementById('nextBtn').addEventListener('click', () => {
+        if (pageNum >= pdfDoc.numPages) return;
+        pageNum++;
+        queueRenderPage(pageNum);
+    });
+
+    document.getElementById('zoomInBtn').addEventListener('click', () => {
+        scale += 0.25;
+        queueRenderPage(pageNum);
+    });
+    
+    document.getElementById('zoomOutBtn').addEventListener('click', () => {
+        if(scale <= 0.5) return;
+        scale -= 0.25;
+        queueRenderPage(pageNum);
+    });
+
+    // --- Word Selection and Popup Logic ---
+    const popup = document.getElementById('wordPopup');
+    let currentWord = "";
+    
+    textLayerDiv.addEventListener('mouseup', handleTextSelection);
+    
+    function handleTextSelection(e) {
+        const selection = window.getSelection();
+        const text = selection.toString().trim();
+        
+        if (text && text.split(/\s+/).length === 1 && /^[a-zA-Z]+$/.test(text)) {
+            // It's a single word
+            currentWord = text;
+            showPopup(e.pageX, e.pageY, text);
+        } else {
+            popup.classList.add('hidden');
+        }
+    }
+
+    async function showPopup(x, y, word) {
+        popup.style.left = `${x}px`;
+        popup.style.top = `${y + 20}px`;
+        popup.classList.remove('hidden');
+        
+        document.getElementById('popupWord').textContent = word;
+        // Reset UI
+        document.getElementById('popupMeaning').textContent = "Loading...";
+        
+        document.getElementById('translationResult').textContent = '';
+        const playTransBtn = document.getElementById('playTranslatedAudioBtn');
+        if(playTransBtn) playTransBtn.classList.add('hidden');
+        
+        // Fetch Dictionary Data
+        try {
+            const res = await fetch(`${API_BASE}/dictionary/${word}`);
+            const data = await res.json();
+            
+            if (data.error) {
+                document.getElementById('popupMeaning').textContent = "Definition not found.";
+            } else {
+                document.getElementById('popupMeaning').textContent = data.meaning || 'No definition found.';
+                
+                // Audio
+                const playBtn = document.getElementById('playAudioBtn');
+                playBtn.style.opacity = data.audio ? '1' : '0.5';
+                playBtn.style.cursor = data.audio ? 'pointer' : 'not-allowed';
+                
+                playBtn.onclick = () => {
+                    if(data.audio) {
+                        const audio = new Audio(data.audio);
+                        audio.play().catch(err => {
+                            console.error("Audio play failed:", err);
+                            alert("Could not play the audio file.");
+                        });
+                    } else {
+                        alert("No audio pronunciation is available for this word.");
+                    }
+                };
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    }
+
+    // Popup Tabs
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            tabs.forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            
+            tab.classList.add('active');
+            document.getElementById(tab.dataset.target).classList.remove('hidden');
+        });
+    });
+
+    document.getElementById('closePopupBtn').addEventListener('click', () => {
+        popup.classList.add('hidden');
+    });
+
+    // Make Popup Draggable
+    const popupHeader = document.querySelector('.popup-header');
+    let isDragging = false;
+    let dragOffsetX, dragOffsetY;
+
+    popupHeader.style.cursor = 'move';
+
+    popupHeader.addEventListener('mousedown', (e) => {
+        // Don't drag if clicking buttons
+        if(e.target.tagName === 'BUTTON') return;
+        
+        isDragging = true;
+        dragOffsetX = e.clientX - popup.getBoundingClientRect().left;
+        dragOffsetY = e.clientY - popup.getBoundingClientRect().top;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        popup.style.left = `${e.clientX - dragOffsetX}px`;
+        popup.style.top = `${e.clientY - dragOffsetY}px`;
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    // Translation
+    document.getElementById('translateBtn').addEventListener('click', async () => {
+        const lang = document.getElementById('targetLanguage').value;
+        const formData = new URLSearchParams();
+        formData.append('word', currentWord);
+        formData.append('target_language', lang);
+        
+        try {
+            const res = await fetch(`${API_BASE}/translate`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            
+            if (data.translation) {
+                document.getElementById('translationResult').textContent = data.translation;
+                
+                // Show play button for translation
+                const playTransBtn = document.getElementById('playTranslatedAudioBtn');
+                playTransBtn.classList.remove('hidden');
+                
+                playTransBtn.onclick = () => {
+                    // Use our TTS proxy with the target language code and translated text
+                    const audioUrl = `/api/tts/${encodeURIComponent(data.translation)}?lang=${data.lang_code}`;
+                    const audio = new Audio(audioUrl);
+                    audio.play().catch(err => {
+                        console.error("Translation audio play failed:", err);
+                        alert("Could not play the translated audio file.");
+                    });
+                };
+            } else {
+                document.getElementById('translationResult').textContent = "Translation failed.";
+                document.getElementById('playTranslatedAudioBtn').classList.add('hidden');
+            }
+        } catch(e) {
+            console.error(e);
+            document.getElementById('translationResult').textContent = "Error.";
+        }
+    });
+
+    // Save Word
+    document.getElementById('saveWordBtn').addEventListener('click', async () => {
+        const userId = localStorage.getItem('user_id');
+        if (!userId) {
+            alert("login for save vocabulary.");
+            return;
+        }
+        
+        const meaning = document.getElementById('popupMeaning').textContent;
+        let translationResult = document.getElementById('translationResult').textContent;
+        
+        // Auto-translate if empty
+        if (!translationResult) {
+            try {
+                const btn = document.getElementById('saveWordBtn');
+                btn.textContent = "Translating...";
+                
+                const lang = document.getElementById('targetLanguage').value;
+                const transData = new URLSearchParams();
+                transData.append('word', currentWord);
+                transData.append('target_language', lang);
+                const tRes = await fetch('/api/translate', { method: 'POST', body: transData });
+                const tJson = await tRes.json();
+                translationResult = tJson.translation || "";
+            } catch (e) {
+                console.error("Auto-translate failed", e);
+            }
+        }
+        
+        const formData = new URLSearchParams();
+        formData.append('user_id', userId);
+        formData.append('pdf_id', currentPdfId);
+        formData.append('word', currentWord);
+        formData.append('meaning', meaning);
+        formData.append('translation', translationResult);
+        formData.append('language', 'English');
+        formData.append('page', pageNum);
+        
+        try {
+            const res = await fetch(`${API_BASE}/vocabulary`, {
+                method: 'POST',
+                body: formData
+            });
+            if(res.ok) {
+                const btn = document.getElementById('saveWordBtn');
+                btn.textContent = "Saved!";
+                btn.classList.replace('primary-btn', 'secondary-btn');
+                setTimeout(() => {
+                    btn.textContent = "Save to Vocabulary";
+                    btn.classList.replace('secondary-btn', 'primary-btn');
+                }, 2000);
+            } else {
+                alert("Failed to save word.");
+            }
+        } catch(e) {
+            console.error(e);
+        }
+    });
+
+    // --- Auth & Session Logic ---
+    const currentUserId = localStorage.getItem('user_id');
+    const currentUserName = localStorage.getItem('user_name');
+    const loginTime = localStorage.getItem('login_time');
+    
+    if (currentUserId) {
+        const loginBtn = document.getElementById('navLoginBtn');
+        if (loginBtn) loginBtn.classList.add('hidden');
+        
+        const authUi = document.getElementById('authUi');
+        if (authUi) {
+            authUi.classList.remove('hidden');
+            // Needed because hidden uses !important in CSS
+            authUi.style.setProperty('display', 'flex', 'important'); 
+        }
+        
+        const nameEl = document.getElementById('navUserName');
+        if (nameEl) nameEl.textContent = `Hi, ${currentUserName}`;
+        
+        // Start timer
+        const timerEl = document.getElementById('navTimer');
+        if (timerEl && loginTime) {
+            setInterval(() => {
+                const diff = Math.floor((Date.now() - parseInt(loginTime)) / 1000);
+                const hrs = String(Math.floor(diff / 3600)).padStart(2, '0');
+                const mins = String(Math.floor((diff % 3600) / 60)).padStart(2, '0');
+                const secs = String(diff % 60).padStart(2, '0');
+                timerEl.textContent = `${hrs}:${mins}:${secs}`;
+            }, 1000);
+        }
+        
+        // Logout
+        const logoutBtn = document.getElementById('navLogoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => {
+                localStorage.removeItem('user_id');
+                localStorage.removeItem('user_name');
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('login_time');
+                window.location.reload();
+            });
+        }
+    }
+
+    // --- History Sync Logic ---
+    let historySyncTimeout;
+    async function syncHistory(pageNumber) {
+        const userId = localStorage.getItem('user_id');
+        if (!userId || !currentPdfId || currentPdfId === 'unknown') return;
+        
+        const fileUrl = localStorage.getItem('lastPdfUrl') || currentPdfId;
+        const title = currentPdfId.replace('.pdf', '');
+        
+        const formData = new URLSearchParams();
+        formData.append('user_id', userId);
+        formData.append('pdf_id', currentPdfId);
+        formData.append('title', title);
+        formData.append('file_url', fileUrl);
+        formData.append('last_page', pageNumber);
+        
+        try {
+            await fetch('/api/history', { method: 'POST', body: formData });
+        } catch(e) {
+            console.error("Failed to sync reading history", e);
+        }
+    }
+}

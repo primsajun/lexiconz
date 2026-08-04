@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WordLens - Reading History</title>
+    <link rel="icon" href="favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- PWA Setup -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <style>
+        .history-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+        .history-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .history-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+            border-color: var(--primary-color);
+        }
+        .pdf-title {
+            font-size: 1.2rem;
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            word-break: break-all;
+        }
+        .pdf-meta {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+        .delete-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: none;
+            border-radius: 4px;
+            padding: 0.3rem 0.6rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            z-index: 10;
+        }
+        .delete-btn:hover {
+            background: rgba(239, 68, 68, 0.4);
+        }
+    </style>
+</head>
+<body class="dark-theme reader-layout">
+    <nav class="reader-nav">
+        <div class="nav-left">
+            <a href="index.html" class="logo">Word<span class="highlight" style="background: #8b5cf6; -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Lens</span></a>
+        </div>
+        <div class="controls">
+            <span style="color: white; font-weight: bold;">Your Reading History</span>
+        </div>
+        <div class="nav-actions">
+            <a href="index.html" class="btn white-btn">← Back</a>
+        </div>
+    </nav>
+
+    <div class="container" style="flex: 1; overflow-y: auto;">
+        <div id="loadingState" style="text-align: center; margin-top: 3rem;">
+            <div class="spinner"></div>
+            <p>Loading your history...</p>
+        </div>
+        <div id="emptyState" class="hidden" style="text-align: center; margin-top: 4rem; color: var(--text-secondary);">
+            <h2>No reading history found.</h2>
+            <p>Open a PDF in the reader to start tracking your progress!</p>
+        </div>
+        <div id="historyGrid" class="history-grid"></div>
+    </div>
+
+    <script>
+        const userId = localStorage.getItem('user_id');
+        
+        if (!userId) {
+            alert("Please login to view your history.");
+            window.location.href = 'login.html';
+        }
+
+        async function fetchHistory() {
+            try {
+                const res = await fetch(`/api/history?user_id=${userId}`);
+                const data = await res.json();
+                
+                document.getElementById('loadingState').classList.add('hidden');
+                
+                if (data.data && data.data.length > 0) {
+                    renderGrid(data.data);
+                } else {
+                    document.getElementById('emptyState').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error loading history.");
+            }
+        }
+
+        function renderGrid(historyItems) {
+            const grid = document.getElementById('historyGrid');
+            grid.innerHTML = '';
+            
+            historyItems.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'history-card';
+                
+                // Format date nicely
+                const dateObj = new Date(item.last_accessed);
+                const dateStr = dateObj.toLocaleDateString() + ' ' + dateObj.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                
+                card.innerHTML = `
+                    <button class="delete-btn" onclick="deleteHistory(event, '${item.id}')">Remove</button>
+                    <div class="pdf-title">${item.title}</div>
+                    <div class="pdf-meta" style="margin-bottom: 0.3rem;"><strong>Last read:</strong> Page ${item.last_page || 1}</div>
+                    <div class="pdf-meta" style="font-size: 0.8rem;">Last accessed: ${dateStr}</div>
+                `;
+                
+                card.addEventListener('click', () => {
+                    // Navigate to index.html with query parameters to auto-load this PDF and page
+                    window.location.href = `index.html?pdfUrl=${encodeURIComponent(item.file_url)}&pdfId=${encodeURIComponent(item.pdf_id)}&page=${item.last_page || 1}`;
+                });
+                
+                grid.appendChild(card);
+            });
+        }
+
+        async function deleteHistory(event, id) {
+            event.stopPropagation(); // Prevent opening the PDF
+            if(!confirm("Remove this PDF from your history?")) return;
+            try {
+                const res = await fetch(`/api/history/${id}?user_id=${userId}`, {
+                    method: 'DELETE'
+                });
+                if (res.ok) {
+                    fetchHistory(); // refresh list
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // Init
+        fetchHistory();
+    </script>
+</body>
+</html>

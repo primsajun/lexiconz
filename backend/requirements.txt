@@ -1,0 +1,8 @@
+FastAPI
+uvicorn
+PyMuPDF
+supabase
+python-dotenv
+requests
+google-generativeai
+python-multipart

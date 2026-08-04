@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WordLens - Reader</title>
+    <link rel="icon" href="favicon.ico">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <!-- PWA Setup -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0f172a">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <!-- PDF.js CSS for Text Layer Alignment -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
+    <!-- PDF.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+</head>
+<body class="dark-theme reader-layout">
+    
+    <!-- Landing View -->
+    <div id="landingView" class="books-theme hidden" style="flex: 1; overflow-y: auto; width: 100%;">
+        <div class="container" style="padding-top: 4rem;">
+            <header class="main-header">
+                <h1 class="books-logo">Word<span>Lens</span></h1>
+                <p class="books-subtitle">Read PDFs and instantly definition or save unknown vocabulary.</p>
+            </header>
+            
+            <div class="upload-section">
+                <div class="upload-card books-card">
+                    <div class="icon">📖</div>
+                    <h2 style="margin-bottom: 1rem; color: var(--books-ink);">Start Reading</h2>
+                    <p style="margin-bottom: 1.5rem; color: var(--books-text);">Upload any PDF document to begin reading with instant definition superpowers.</p>
+                    <input type="file" id="landingPdfInput" accept="application/pdf" hidden>
+                    <button id="landingUploadBtn" class="btn books-btn" style="font-size: 1.1rem; padding: 1rem 2rem;">Open Book</button>
+                </div>
+            </div>
+
+            <h2 style="text-align: center; margin-bottom: 2rem; color: var(--books-ink); font-family: 'Georgia', serif;">Why Use WordLens?</h2>
+            <div class="features">
+                <div class="feature books-feature">
+                    <h3>📖 Smart Reading</h3>
+                    <p>Simply click or highlight any word in the PDF to instantly see its meaning without ever leaving the page.</p>
+                </div>
+                <div class="feature books-feature">
+                    <h3>🌍 Instant Translation</h3>
+                    <p>Translate difficult words immediately into Tamil, Hindi, French, or Spanish with one click and hear the pronunciation.</p>
+                </div>
+                <div class="feature books-feature">
+                    <h3>📚 Personal Library</h3>
+                    <p>Save new vocabulary directly to your personal library so you can review and study them later.</p>
+                </div>
+                <div class="feature books-feature">
+                    <h3>⏳ History & Time Tracking</h3>
+                    <p>We automatically remember exactly which page you were on, and track your active reading time so you can monitor your study sessions.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reader View -->
+    <div id="readerView" style="display: none; flex: 1; flex-direction: column; height: 100%; width: 100%;">
+
+    <!-- Top Navigation -->
+    <nav class="reader-nav">
+        <a href="index.html?home=true" class="logo">Word<span class="highlight" style="background: #8b5cf6; -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Lens</span></a>
+        
+        <div class="nav-center">
+            <div class="controls">
+                <button id="prevBtn" class="btn secondary-btn small-btn">Prev</button>
+                <span style="font-size: 0.9rem;">Pg: <span id="pageNum">1</span> / <span id="pageCount">?</span></span>
+                <button id="nextBtn" class="btn secondary-btn small-btn">Next</button>
+                <button id="zoomOutBtn" class="btn white-btn">-</button>
+                <span id="zoomLevel" style="font-size: 0.8rem; font-weight: bold; min-width: 40px; text-align: center;">100%</span>
+                <button id="zoomInBtn" class="btn white-btn">+</button>
+            </div>
+            <div class="action-buttons">
+                <a href="history.html" class="btn white-btn nav-btn">History</a>
+                <a href="vocabulary.html" class="btn white-btn nav-btn">Library</a>
+                <input type="file" id="navPdfInput" accept="application/pdf" hidden>
+                <button id="navUploadBtn" class="btn primary-btn nav-btn">Upload</button>
+            </div>
+        </div>
+
+        <div class="nav-right">
+            <div id="authUi" class="hidden auth-ui">
+                <span id="navUserName" class="user-name-text"></span>
+                <span id="navTimer" class="timer-text">00:00:00</span>
+                <button id="navLogoutBtn" class="btn secondary-btn small-btn logout-btn">Logout</button>
+            </div>
+            <a href="login.html" id="navLoginBtn" class="btn white-btn">Login</a>
+        </div>
+    </nav>
+
+    <div class="reader-container">
+        <!-- Loading Overlay -->
+        <div id="pdfLoadingOverlay" class="hidden">
+            <div class="spinner"></div>
+            <p style="margin-top:1rem; font-weight:bold; color:var(--primary-color);">Loading PDF...</p>
+        </div>
+        <!-- PDF Viewer -->
+        <main class="pdf-viewer" id="pdfViewer">
+            <div id="pdfContainer" style="position: relative;">
+                <canvas id="pdfRenderCanvas"></canvas>
+                <!-- Overlay for text selection -->
+                <div id="textLayer" class="textLayer"></div>
+            </div>
+        </main>
+    </div>
+    </div> <!-- End Reader View -->
+
+    <!-- Word Definition Popup -->
+    <div id="wordPopup" class="popup hidden">
+        <div class="popup-header">
+            <h2 id="popupWord">Word</h2>
+            <button id="playAudioBtn" class="icon-btn">🔊</button>
+            <button id="closePopupBtn" class="icon-btn">×</button>
+        </div>
+        <div class="popup-content">
+            <div class="tabs">
+                <button class="tab active" data-target="meaningTab">Meaning</button>
+            </div>
+            
+            <div id="meaningTab" class="tab-content active">
+                <p><strong>Definition:</strong> <span id="popupMeaning"></span></p>
+            </div>
+            
+            <!-- Translation Section -->
+            <div class="translation-section">
+                <select id="targetLanguage">
+                    <option value="Tamil">Tamil</option>
+                    <option value="Hindi">Hindi</option>
+                    <option value="French">French</option>
+                    <option value="Spanish">Spanish</option>
+                </select>
+                <button id="translateBtn" class="btn small-btn">Translate</button>
+                <div style="margin-top: 0.5rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <p id="translationResult" class="translation-result" style="margin: 0;"></p>
+                    <button id="playTranslatedAudioBtn" class="icon-btn hidden" style="font-size: 1rem;">🔊</button>
+                </div>
+            </div>
+        </div>
+        <div class="popup-footer">
+            <button id="saveWordBtn" class="btn primary-btn full-width">Save to Vocabulary</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
