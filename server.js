@@ -5,6 +5,7 @@ import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
@@ -14,7 +15,14 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const port = process.env.PORT || 3000;
-const upload = multer();
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'public/uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const upload = multer({ dest: 'public/uploads/' });
 
 app.use(cors());
 app.use(express.json());
@@ -91,14 +99,21 @@ app.get('/api/tts/:word', async (req, res) => {
     }
 });
 
-// Save PDF
-app.post('/api/save_pdf', upload.none(), async (req, res) => {
-    const { filename, public_url } = req.body;
-    if (!filename || !public_url) return res.status(400).json({ error: "Missing parameters" });
+// Local File Upload
+app.post('/api/upload', upload.single('pdf'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
     
-    const { data, error } = await supabase.from('pdfs').insert([{ title: filename, file_url: public_url }]);
+    const safeName = Date.now() + "_" + req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const targetPath = path.join(uploadsDir, safeName);
+    fs.renameSync(req.file.path, targetPath);
+    
+    const publicUrl = `/uploads/${safeName}`;
+    
+    // Save record to DB
+    const { data, error } = await supabase.from('pdfs').insert([{ title: req.file.originalname, file_url: publicUrl }]);
     if (error) return res.status(500).json({ error: error.message });
-    res.json({ status: "success", data });
+    
+    res.json({ status: "success", url: publicUrl, filename: req.file.originalname, data });
 });
 
 // Auth Register
