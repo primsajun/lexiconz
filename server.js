@@ -143,11 +143,14 @@ app.get('/api/history', async (req, res) => {
     const { user_id } = req.query;
     if (!user_id) return res.status(400).json({ error: "Missing user_id" });
 
-    const localItems = readHistoryStore()
-        .filter(item => item.user_id === user_id)
-        .sort((a, b) => new Date(b.last_accessed) - new Date(a.last_accessed));
+    const { data, error } = await supabase
+        .from('reading_history')
+        .select('*')
+        .eq('user_id', user_id)
+        .order('last_accessed', { ascending: false });
 
-    res.json({ data: localItems });
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ data: data || [] });
 });
 
 // History POST
@@ -155,22 +158,34 @@ app.post('/api/history', upload.none(), async (req, res) => {
     const { user_id, pdf_id, title, file_url, last_page } = req.body;
     if (!user_id || !pdf_id || !file_url) return res.status(400).json({ error: "Missing parameters" });
 
-    const safeUserId = String(user_id);
-    const safePdfId = String(pdf_id || '').trim() || `pdf-${Date.now()}`;
-    const safeTitle = String(title || safePdfId).trim();
-    const safeFileUrl = String(file_url).trim();
-    const record = {
-        id: `local-${Date.now()}`,
-        user_id: safeUserId,
-        pdf_id: safePdfId,
-        title: safeTitle,
-        file_url: safeFileUrl,
-        last_page: parseInt(last_page, 10) || 1,
-        last_accessed: new Date().toISOString()
-    };
+    const { data: existing } = await supabase
+        .from('reading_history')
+        .select('id')
+        .eq('user_id', user_id)
+        .eq('pdf_id', pdf_id)
+        .single();
 
-    upsertHistoryStore(safeUserId, record);
-    res.json({ status: "success", source: 'local' });
+    if (existing) {
+        const { error } = await supabase
+            .from('reading_history')
+            .update({ last_page: parseInt(last_page, 10) || 1, last_accessed: new Date().toISOString() })
+            .eq('id', existing.id);
+        if (error) return res.status(500).json({ error: error.message });
+    } else {
+        const { error } = await supabase
+            .from('reading_history')
+            .insert([{
+                user_id,
+                pdf_id,
+                title: title || pdf_id,
+                file_url,
+                last_page: parseInt(last_page, 10) || 1,
+                last_accessed: new Date().toISOString()
+            }]);
+        if (error) return res.status(500).json({ error: error.message });
+    }
+
+    res.json({ status: "success", source: 'supabase' });
 });
 
 // History DELETE
@@ -179,8 +194,14 @@ app.delete('/api/history/:id', async (req, res) => {
     const { user_id } = req.query;
     if (!id || !user_id) return res.status(400).json({ error: "Missing parameters" });
 
-    deleteHistoryStore(user_id, id);
-    res.json({ status: "success", source: 'local' });
+    const { error } = await supabase
+        .from('reading_history')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user_id);
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ status: "success" });
 });
 
 // Vocabulary GET
