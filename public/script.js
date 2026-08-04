@@ -112,6 +112,50 @@ if (pdfViewer) {
         ctx.fillText("Upload a PDF to start reading...", 50, 100);
     }
 
+    async function uploadPdfDirectly(file) {
+        // 1. Get Supabase Config from Backend
+        const configRes = await fetch(resolveApiUrl("/config"));
+        const config = await configRes.json();
+        
+        if (!config.supabase_url || !config.supabase_key) {
+            throw new Error("Missing Supabase configuration. Ensure env variables are set.");
+        }
+
+        // 2. Upload directly from Browser to Supabase (Bypasses Vercel's 4.5MB limit)
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+        const uploadUrl = `${config.supabase_url}/storage/v1/object/pdfs/${safeName}`;
+        
+        const uploadRes = await fetch(uploadUrl, {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${config.supabase_key}`,
+                "apikey": config.supabase_key,
+                "Content-Type": file.type || "application/pdf",
+                "x-upsert": "true"
+            },
+            body: file
+        });
+
+        if (!uploadRes.ok) {
+            const err = await uploadRes.text();
+            throw new Error(`Supabase upload failed: ${err}`);
+        }
+
+        // 3. Calculate Public URL
+        const publicUrl = `${config.supabase_url}/storage/v1/object/public/pdfs/${safeName}`;
+
+        // 4. Tell Backend to save the record
+        const saveFormData = new URLSearchParams();
+        saveFormData.append("filename", file.name);
+        saveFormData.append("public_url", publicUrl);
+        await fetch(resolveApiUrl("/save_pdf"), {
+            method: "POST",
+            body: saveFormData
+        });
+
+        return { filename: file.name, url: publicUrl };
+    }
+
     // Landing Page Upload Logic
     const landingUploadBtn = document.getElementById('landingUploadBtn');
     const landingPdfInput = document.getElementById('landingPdfInput');
@@ -129,24 +173,14 @@ if (pdfViewer) {
             if (readerView) readerView.style.display = 'flex';
             document.getElementById('pdfLoadingOverlay').classList.remove('hidden');
             
-            const formData = new FormData();
-            formData.append("file", file);
-            
-            landingUploadBtn.textContent = "Uploading...";
-            landingUploadBtn.disabled = true;
-
             try {
-                const response = await fetch(resolveApiUrl("/upload"), {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await response.json();
+                const data = await uploadPdfDirectly(file);
                 if (data.url) {
                     loadPDF(data.url, data.filename);
                 }
             } catch (error) {
                 console.error("Upload failed", error);
-                alert("Upload failed. Please check backend server.");
+                alert("Upload failed: " + error.message);
                 if (landingView) landingView.classList.remove('hidden');
                 if (readerView) readerView.style.display = 'none';
             } finally {
@@ -169,24 +203,14 @@ if (pdfViewer) {
             if (e.target.files.length === 0) return;
             const file = e.target.files[0];
             document.getElementById('pdfLoadingOverlay').classList.remove('hidden');
-            const formData = new FormData();
-            formData.append("file", file);
-            
-            navUploadBtn.textContent = "Uploading...";
-            navUploadBtn.disabled = true;
-
             try {
-                const response = await fetch(resolveApiUrl("/upload"), {
-                    method: "POST",
-                    body: formData
-                });
-                const data = await response.json();
+                const data = await uploadPdfDirectly(file);
                 if (data.url) {
                     loadPDF(data.url, data.filename);
                 }
             } catch (error) {
                 console.error("Upload failed", error);
-                alert("Upload failed. Please check backend server.");
+                alert("Upload failed: " + error.message);
             } finally {
                 navUploadBtn.textContent = "Upload PDF";
                 navUploadBtn.disabled = false;

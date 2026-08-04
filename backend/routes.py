@@ -11,30 +11,22 @@ import requests
 
 router = APIRouter()
 
-@router.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are allowed.")
+@router.get("/config")
+async def get_config():
+    # Provide the public anon key to the frontend so it can upload files directly to Supabase, 
+    # bypassing Vercel's strict 4.5MB serverless payload limit.
+    return {
+        "supabase_url": os.getenv("SUPABASE_URL"),
+        "supabase_key": os.getenv("SUPABASE_KEY")
+    }
 
-    await file.seek(0)
-
-    # Upload directly to Supabase Storage so deployment does not depend on local disk.
-    public_url = upload_pdf_to_storage(file.file, file.filename)
-
-    if not public_url:
-        if os.getenv("VERCEL"):
-            raise HTTPException(status_code=500, detail="Failed to upload PDF to storage.")
-
-        # Local-development fallback only.
-        temp_path = os.path.join("uploads", file.filename)
-        os.makedirs("uploads", exist_ok=True)
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        public_url = f"/uploads/{file.filename}"
-
-    save_pdf(file.filename, public_url)
-    
-    return {"filename": file.filename, "url": public_url}
+@router.post("/save_pdf")
+async def save_pdf_record(filename: str = Form(...), public_url: str = Form(...)):
+    try:
+        save_pdf(filename, public_url)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/dictionary/{word}")
