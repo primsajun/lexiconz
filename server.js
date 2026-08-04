@@ -3,35 +3,26 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
 
 dotenv.config();
-
-const _filename = fileURLToPath(import.meta.url);
-const _dirname = path.dirname(_filename);
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.send('Server is running');
 });
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
 );
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 // Config
 app.get('/api/config', (req, res) => {
@@ -100,30 +91,15 @@ app.get('/api/tts/:word', async (req, res) => {
     }
 });
 
-// Supabase Storage Upload
-app.post('/api/upload', upload.single('pdf'), async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-    const safeName = `${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('pdfs')
-        .upload(safeName, req.file.buffer, {
-            contentType: req.file.mimetype || 'application/pdf',
-            upsert: false
-        });
-
-    if (uploadError) {
-        return res.status(500).json({ error: uploadError.message });
-    }
-
-    const { data: publicData } = supabase.storage.from('pdfs').getPublicUrl(safeName);
-    const publicUrl = publicData.publicUrl;
-
-    const { data, error } = await supabase.from('pdfs').insert([{ title: req.file.originalname, file_url: publicUrl }]);
+// Save PDF
+app.post('/api/save_pdf', upload.none(), async (req, res) => {
+    const { filename, public_url } = req.body;
+    if (!filename || !public_url) return res.status(400).json({ error: "Missing parameters" });
+    
+    const { data, error } = await supabase.from('pdfs').insert([{ title: filename, file_url: public_url }]);
     if (error) return res.status(500).json({ error: error.message });
-
-    res.json({ status: "success", url: publicUrl, filename: req.file.originalname, data, storagePath: uploadData?.path });
+    
+    res.json({ status: "success", data });
 });
 
 // Auth Register
@@ -151,25 +127,34 @@ app.get('/api/history', async (req, res) => {
     const { user_id } = req.query;
     if (!user_id) return res.status(400).json({ error: "Missing user_id" });
 
-    const { data, error } = await supabase.from('reading_history').select('*').eq('user_id', user_id).order('last_accessed', { ascending: false });
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ data: data || [] });
+    const localItems = readHistoryStore()
+        .filter(item => item.user_id === user_id)
+        .sort((a, b) => new Date(b.last_accessed) - new Date(a.last_accessed));
+
+    res.json({ data: localItems });
 });
 
 // History POST
 app.post('/api/history', upload.none(), async (req, res) => {
-    const { user_id, title, file_url, last_page } = req.body;
-    if (!user_id || !file_url) return res.status(400).json({ error: "Missing parameters" });
-    
-    const { data: existing } = await supabase.from('reading_history').select('*').eq('user_id', user_id).eq('file_url', file_url).single();
-    let result;
-    if (existing) {
-        result = await supabase.from('reading_history').update({ last_page: parseInt(last_page) || 1, last_accessed: new Date().toISOString() }).eq('id', existing.id);
-    } else {
-        result = await supabase.from('reading_history').insert([{ user_id, title, file_url, last_page: parseInt(last_page) || 1 }]);
-    }
-    if (result.error) return res.status(400).json({ error: result.error.message });
-    res.json({ status: "success" });
+    const { user_id, pdf_id, title, file_url, last_page } = req.body;
+    if (!user_id || !pdf_id || !file_url) return res.status(400).json({ error: "Missing parameters" });
+
+    const safeUserId = String(user_id);
+    const safePdfId = String(pdf_id || '').trim() || `pdf-${Date.now()}`;
+    const safeTitle = String(title || safePdfId).trim();
+    const safeFileUrl = String(file_url).trim();
+    const record = {
+        id: `local-${Date.now()}`,
+        user_id: safeUserId,
+        pdf_id: safePdfId,
+        title: safeTitle,
+        file_url: safeFileUrl,
+        last_page: parseInt(last_page, 10) || 1,
+        last_accessed: new Date().toISOString()
+    };
+
+    upsertHistoryStore(safeUserId, record);
+    res.json({ status: "success", source: 'local' });
 });
 
 // History DELETE
@@ -178,9 +163,8 @@ app.delete('/api/history/:id', async (req, res) => {
     const { user_id } = req.query;
     if (!id || !user_id) return res.status(400).json({ error: "Missing parameters" });
 
-    const { error } = await supabase.from('reading_history').delete().eq('id', id).eq('user_id', user_id);
-    if (error) return res.status(400).json({ error: error.message });
-    res.json({ status: "success" });
+    deleteHistoryStore(user_id, id);
+    res.json({ status: "success", source: 'local' });
 });
 
 // Vocabulary GET
@@ -214,11 +198,7 @@ app.delete('/api/vocabulary/:id', async (req, res) => {
     res.json({ status: "success" });
 });
 
-// Start Server (only if not running in a serverless environment like Netlify)
-if (process.env.NODE_ENV !== 'production' && !process.env.NETLIFY) {
-    app.listen(port, () => {
-        console.log(`\n🚀 Server is running at http://localhost:${port}\n`);
-    });
-}
-
-export default app;
+// Start Server
+app.listen(port, () => {
+    console.log(`\n🚀 Server is running at http://localhost:${port}\n`);
+});
