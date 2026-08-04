@@ -1,6 +1,5 @@
 FastAPI
 uvicorn
-PyMuPDF
 supabase
 python-dotenv
 requests
