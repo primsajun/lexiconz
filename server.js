@@ -21,7 +21,7 @@ app.get('/', (req, res) => {
 
 const supabase = createClient(
     process.env.SUPABASE_URL || 'https://rvaybtduugfsgnyawywa.supabase.co',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2YXlidGR1dWdmc2dueWF3eXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjcxNjEsImV4cCI6MjEwMTM0MzE2MX0.5LMuzC0GLecR1YZqE4lnbwqmuVlUzM3_lpFYain1Ym0'
+    process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2YXlidGR1dWdmc2dueWF3eXdhIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTc2NzE2MSwiZXhwIjoyMTAxMzQzMTYxfQ.yDSwNS5f641XEaBWFcpcWyc0VAoBj0h83pd9WbqEwZE'
 );
 
 // Config
@@ -91,15 +91,31 @@ app.get('/api/tts/:word', async (req, res) => {
     }
 });
 
-// Save PDF
-app.post('/api/save_pdf', upload.none(), async (req, res) => {
-    const { filename, public_url } = req.body;
-    if (!filename || !public_url) return res.status(400).json({ error: "Missing parameters" });
-    
-    const { data, error } = await supabase.from('pdfs').insert([{ title: filename, file_url: public_url }]);
+// Supabase Storage Upload via Backend (Bypasses RLS)
+app.post('/api/upload', upload.single('pdf'), async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const safeName = `${Date.now()}_${req.file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+
+    // Upload buffer directly to Supabase
+    const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('pdfs')
+        .upload(safeName, req.file.buffer, {
+            contentType: req.file.mimetype || 'application/pdf',
+            upsert: false
+        });
+
+    if (uploadError) {
+        return res.status(500).json({ error: uploadError.message });
+    }
+
+    const { data: publicData } = supabase.storage.from('pdfs').getPublicUrl(safeName);
+    const publicUrl = publicData.publicUrl;
+
+    const { data, error } = await supabase.from('pdfs').insert([{ title: req.file.originalname, file_url: publicUrl }]);
     if (error) return res.status(500).json({ error: error.message });
-    
-    res.json({ status: "success", data });
+
+    res.json({ status: "success", url: publicUrl, filename: req.file.originalname, data });
 });
 
 // Auth Register
