@@ -11,6 +11,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="config.js"></script>
 </head>
 <body class="dark-theme" style="display: flex; justify-content: center; align-items: center; background: #000000; margin: 0; min-height: 100vh;">
     <div class="upload-card" style="margin: 0; text-align: left; padding: 2rem 3rem;">
@@ -48,6 +49,8 @@
     </div>
 
     <script>
+        const API_BASE = window.__WORDLENS_API_BASE__ || ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || !window.location.hostname) ? 'http://localhost:8000/api' : '/api');
+
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const name = document.getElementById('regName').value;
@@ -73,7 +76,7 @@
             formData.append('password', password);
 
             try {
-                const res = await fetch('/api/auth/register', {
+                const res = await fetch(`${API_BASE}/auth/register`, {
                     method: 'POST',
                     body: formData
                 });

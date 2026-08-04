@@ -12,11 +12,12 @@ def extract_text_from_pdf(filepath: str):
         print(f"Error extracting text: {e}")
     return text
 
-def upload_pdf_to_storage(filepath: str, filename: str):
+def upload_pdf_to_storage(file_obj, filename: str):
     try:
         # Assumes a bucket named "pdfs" exists in Supabase
-        with open(filepath, 'rb') as f:
-            res = supabase.storage.from_('pdfs').upload(filename, f)
+        if hasattr(file_obj, "seek"):
+            file_obj.seek(0)
+        res = supabase.storage.from_('pdfs').upload(filename, file_obj)
             
         # Get public URL
         public_url = supabase.storage.from_('pdfs').get_public_url(filename)

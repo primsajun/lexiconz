@@ -1,6 +1,36 @@
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = window.__WORDLENS_API_BASE__ || ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || !window.location.hostname)
+    ? "http://localhost:8000/api"
+    : "/api");
 let currentPdfId = "";
 let currentPdfText = ""; // For basic context to AI
+
+function resolveApiUrl(path) {
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return `${API_BASE.replace(/\/$/, "")}${normalizedPath}`;
+}
+
+function resolvePdfUrl(url) {
+    if (!url) return url;
+    if (/^https?:\/\//i.test(url)) return url;
+    if (url.startsWith("/")) {
+        if (API_BASE.startsWith("http")) {
+            try {
+                const base = new URL(API_BASE);
+                return `${base.origin}${url}`;
+            } catch (err) {
+                return `http://localhost:8000${url}`;
+            }
+        }
+
+        if (window.location.origin && window.location.origin !== "null") {
+            return `${window.location.origin}${url}`;
+        }
+
+        return `http://localhost:8000${url}`;
+    }
+
+    return url;
+}
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {
@@ -51,7 +81,7 @@ if (pdfViewer) {
         localStorage.setItem('lastPdfUrl', url);
         localStorage.setItem('lastPdfId', currentPdfId);
         
-        const fetchUrl = url.startsWith('/') ? `http://localhost:8000${url}` : url;
+        const fetchUrl = resolvePdfUrl(url);
         
         pdfjsLib.getDocument(fetchUrl).promise.then(function(pdfDoc_) {
             pdfDoc = pdfDoc_;
@@ -106,7 +136,7 @@ if (pdfViewer) {
             landingUploadBtn.disabled = true;
 
             try {
-                const response = await fetch(`${API_BASE}/upload`, {
+                const response = await fetch(resolveApiUrl("/upload"), {
                     method: "POST",
                     body: formData
                 });
@@ -146,7 +176,7 @@ if (pdfViewer) {
             navUploadBtn.disabled = true;
 
             try {
-                const response = await fetch(`${API_BASE}/upload`, {
+                const response = await fetch(resolveApiUrl("/upload"), {
                     method: "POST",
                     body: formData
                 });
@@ -295,7 +325,7 @@ if (pdfViewer) {
         
         // Fetch Dictionary Data
         try {
-            const res = await fetch(`${API_BASE}/dictionary/${word}`);
+            const res = await fetch(resolveApiUrl(`/dictionary/${word}`));
             const data = await res.json();
             
             if (data.error) {
@@ -375,7 +405,7 @@ if (pdfViewer) {
         formData.append('target_language', lang);
         
         try {
-            const res = await fetch(`${API_BASE}/translate`, {
+            const res = await fetch(resolveApiUrl("/translate"), {
                 method: 'POST',
                 body: formData
             });
@@ -390,7 +420,7 @@ if (pdfViewer) {
                 
                 playTransBtn.onclick = () => {
                     // Use our TTS proxy with the target language code and translated text
-                    const audioUrl = `/api/tts/${encodeURIComponent(data.translation)}?lang=${data.lang_code}`;
+                    const audioUrl = resolveApiUrl(`/tts/${encodeURIComponent(data.translation)}?lang=${data.lang_code}`);
                     const audio = new Audio(audioUrl);
                     audio.play().catch(err => {
                         console.error("Translation audio play failed:", err);
@@ -428,7 +458,7 @@ if (pdfViewer) {
                 const transData = new URLSearchParams();
                 transData.append('word', currentWord);
                 transData.append('target_language', lang);
-                const tRes = await fetch('/api/translate', { method: 'POST', body: transData });
+                const tRes = await fetch(resolveApiUrl('/translate'), { method: 'POST', body: transData });
                 const tJson = await tRes.json();
                 translationResult = tJson.translation || "";
             } catch (e) {
@@ -446,7 +476,7 @@ if (pdfViewer) {
         formData.append('page', pageNum);
         
         try {
-            const res = await fetch(`${API_BASE}/vocabulary`, {
+            const res = await fetch(resolveApiUrl("/vocabulary"), {
                 method: 'POST',
                 body: formData
             });
@@ -527,7 +557,7 @@ if (pdfViewer) {
         formData.append('last_page', pageNumber);
         
         try {
-            await fetch('/api/history', { method: 'POST', body: formData });
+            await fetch(resolveApiUrl('/history'), { method: 'POST', body: formData });
         } catch(e) {
             console.error("Failed to sync reading history", e);
         }

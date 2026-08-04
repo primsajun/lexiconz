@@ -11,6 +11,7 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0f172a">
     <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="config.js"></script>
     <style>
         .history-grid {
             display: grid;
@@ -87,6 +88,7 @@
     </div>
 
     <script>
+        const API_BASE = window.__WORDLENS_API_BASE__ || ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || !window.location.hostname) ? 'http://localhost:8000/api' : '/api');
         const userId = localStorage.getItem('user_id');
         
         if (!userId) {
@@ -96,7 +98,7 @@
 
         async function fetchHistory() {
             try {
-                const res = await fetch(`/api/history?user_id=${userId}`);
+                const res = await fetch(`${API_BASE}/history?user_id=${userId}`);
                 const data = await res.json();
                 
                 document.getElementById('loadingState').classList.add('hidden');
@@ -144,7 +146,7 @@
             event.stopPropagation(); // Prevent opening the PDF
             if(!confirm("Remove this PDF from your history?")) return;
             try {
-                const res = await fetch(`/api/history/${id}?user_id=${userId}`, {
+                const res = await fetch(`${API_BASE}/history/${id}?user_id=${userId}`, {
                     method: 'DELETE'
                 });
                 if (res.ok) {
