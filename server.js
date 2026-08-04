@@ -36,12 +36,20 @@ app.get('/api/config', (req, res) => {
 app.get('/api/dictionary/:word', async (req, res) => {
     const { word } = req.params;
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-        const prompt = `Define the word "${word}". Return a JSON object with EXACTLY this structure, nothing else (no markdown, no quotes): {"word": "${word}", "meaning": "A clear, concise definition of the word.", "audio": null}`;
-        const result = await model.generateContent(prompt);
-        let text = result.response.text();
-        text = text.replace(/```json/g, "").replace(/```/g, "").trim();
-        res.json(JSON.parse(text));
+        const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=en&dt=md&q=${encodeURIComponent(word)}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        let meaning = "No definition found.";
+        if (data && data[12] && data[12][0] && data[12][0][1] && data[12][0][1][0]) {
+            meaning = data[12][0][1][0][0];
+        }
+        
+        res.json({
+            word: word,
+            meaning: meaning,
+            audio: null
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
