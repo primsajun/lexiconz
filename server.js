@@ -20,15 +20,15 @@ app.get('/', (req, res) => {
 });
 
 const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY
+    process.env.SUPABASE_URL || 'https://rvaybtduugfsgnyawywa.supabase.co',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2YXlidGR1dWdmc2dueWF3eXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjcxNjEsImV4cCI6MjEwMTM0MzE2MX0.5LMuzC0GLecR1YZqE4lnbwqmuVlUzM3_lpFYain1Ym0'
 );
 
 // Config
 app.get('/api/config', (req, res) => {
     res.json({
-        supabase_url: process.env.SUPABASE_URL,
-        supabase_key: process.env.SUPABASE_KEY
+        supabase_url: process.env.SUPABASE_URL || 'https://rvaybtduugfsgnyawywa.supabase.co',
+        supabase_key: process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ2YXlidGR1dWdmc2dueWF3eXdhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU3NjcxNjEsImV4cCI6MjEwMTM0MzE2MX0.5LMuzC0GLecR1YZqE4lnbwqmuVlUzM3_lpFYain1Ym0'
     });
 });
 
