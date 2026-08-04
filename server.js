@@ -133,15 +133,15 @@ app.get('/api/history', async (req, res) => {
 
 // History POST
 app.post('/api/history', upload.none(), async (req, res) => {
-    const { user_id, pdf_id, title, file_url, last_page } = req.body;
-    if (!user_id || !pdf_id) return res.status(400).json({ error: "Missing parameters" });
+    const { user_id, title, file_url, last_page } = req.body;
+    if (!user_id || !file_url) return res.status(400).json({ error: "Missing parameters" });
     
-    const { data: existing } = await supabase.from('reading_history').select('*').eq('user_id', user_id).eq('pdf_id', pdf_id).single();
+    const { data: existing } = await supabase.from('reading_history').select('*').eq('user_id', user_id).eq('file_url', file_url).single();
     let result;
     if (existing) {
         result = await supabase.from('reading_history').update({ last_page: parseInt(last_page), last_accessed: new Date().toISOString() }).eq('id', existing.id);
     } else {
-        result = await supabase.from('reading_history').insert([{ user_id, pdf_id, title, file_url, last_page: parseInt(last_page) }]);
+        result = await supabase.from('reading_history').insert([{ user_id, title, file_url, last_page: parseInt(last_page) }]);
     }
     if (result.error) return res.status(400).json({ error: result.error.message });
     res.json({ status: "success" });
@@ -170,10 +170,10 @@ app.get('/api/vocabulary', async (req, res) => {
 
 // Vocabulary POST
 app.post('/api/vocabulary', upload.none(), async (req, res) => {
-    const { user_id, pdf_id, word, meaning, translation, language, page } = req.body;
+    const { user_id, word, meaning, translation, language, page } = req.body;
     if (!user_id || !word) return res.status(400).json({ error: "Missing parameters" });
     
-    const { error } = await supabase.from('saved_words').insert([{ user_id, pdf_id: pdf_id || null, word, meaning, translation, language, page: parseInt(page) || 1 }]);
+    const { error } = await supabase.from('saved_words').insert([{ user_id, pdf_id: null, word, meaning, translation, language, page: parseInt(page) || 1 }]);
     if (error) return res.status(400).json({ error: error.message });
     res.json({ status: "success" });
 });
