@@ -36,7 +36,7 @@ app.get('/api/config', (req, res) => {
 app.get('/api/dictionary/:word', async (req, res) => {
     const { word } = req.params;
     try {
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
         const prompt = `Define the word "${word}". Return a JSON object with EXACTLY this structure, nothing else (no markdown, no quotes): {"word": "${word}", "meaning": "A clear, concise definition of the word.", "audio": null}`;
         const result = await model.generateContent(prompt);
         let text = result.response.text();

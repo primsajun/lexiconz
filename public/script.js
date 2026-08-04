@@ -357,19 +357,16 @@ if (pdfViewer) {
                 
                 // Audio
                 const playBtn = document.getElementById('playAudioBtn');
-                playBtn.style.opacity = data.audio ? '1' : '0.5';
-                playBtn.style.cursor = data.audio ? 'pointer' : 'not-allowed';
+                playBtn.style.opacity = '1';
+                playBtn.style.cursor = 'pointer';
                 
                 playBtn.onclick = () => {
-                    if(data.audio) {
-                        const audio = new Audio(data.audio);
-                        audio.play().catch(err => {
-                            console.error("Audio play failed:", err);
-                            alert("Could not play the audio file.");
-                        });
-                    } else {
-                        alert("No audio pronunciation is available for this word.");
-                    }
+                    const audioUrl = resolveApiUrl(`/tts/${encodeURIComponent(word)}?lang=en`);
+                    const audio = new Audio(audioUrl);
+                    audio.play().catch(err => {
+                        console.error("Audio play failed:", err);
+                        alert("Could not play the audio file.");
+                    });
                 };
             }
         } catch(e) {
