@@ -6,7 +6,7 @@
     if (!apiBase) {
         const hostname = window.location.hostname;
         if (!hostname || hostname === "localhost" || hostname === "127.0.0.1") {
-            apiBase = "http://localhost:8000/api";
+            apiBase = "/api";
         } else {
             apiBase = "/api";
         }
@@ -24,7 +24,7 @@
                     const base = new URL(window.__WORDLENS_API_BASE__);
                     return `${base.origin}${url}`;
                 } catch (err) {
-                    return `http://localhost:8000${url}`;
+                    return url;
                 }
             }
 
@@ -32,7 +32,7 @@
                 return `${window.location.origin}${url}`;
             }
 
-            return `http://localhost:8000${url}`;
+            return url;
         }
 
         return url;

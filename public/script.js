@@ -1,6 +1,4 @@
-const API_BASE = window.__WORDLENS_API_BASE__ || ((window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || !window.location.hostname)
-    ? "http://localhost:8000/api"
-    : "/api");
+const API_BASE = window.__WORDLENS_API_BASE__ || "/api";
 let currentPdfId = "";
 let currentPdfText = ""; // For basic context to AI
 
@@ -18,7 +16,7 @@ function resolvePdfUrl(url) {
                 const base = new URL(API_BASE);
                 return `${base.origin}${url}`;
             } catch (err) {
-                return `http://localhost:8000${url}`;
+                return url;
             }
         }
 
@@ -26,7 +24,7 @@ function resolvePdfUrl(url) {
             return `${window.location.origin}${url}`;
         }
 
-        return `http://localhost:8000${url}`;
+        return url;
     }
 
     return url;
