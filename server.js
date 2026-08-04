@@ -163,7 +163,7 @@ app.get('/api/vocabulary', async (req, res) => {
     const { user_id } = req.query;
     if (!user_id) return res.status(400).json({ error: "Missing user_id" });
     
-    const { data, error } = await supabase.from('saved_words').select('*').eq('user_id', user_id).order('saved_at', { ascending: false });
+    const { data, error } = await supabase.from('saved_words').select('*').eq('user_id', user_id).order('created_at', { ascending: false });
     if (error) return res.status(400).json({ error: error.message });
     res.json({ data: data || [] });
 });
