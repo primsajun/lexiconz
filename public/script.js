@@ -469,7 +469,9 @@ if (pdfViewer) {
     document.getElementById('saveWordBtn').addEventListener('click', async () => {
         const userId = localStorage.getItem('user_id');
         if (!userId) {
-            alert("login for save vocabulary.");
+            if (confirm("You need to login to save vocabulary and track history. Go to Login page?")) {
+                window.location.href = "login.html";
+            }
             return;
         }
         
@@ -542,6 +544,26 @@ if (pdfViewer) {
         
         const nameEl = document.getElementById('navUserName');
         if (nameEl) nameEl.textContent = `Hi, ${currentUserName}`;
+        
+        const landingGuestUi = document.getElementById('landingGuestUi');
+        if (landingGuestUi) landingGuestUi.classList.add('hidden');
+        
+        const landingAuthUi = document.getElementById('landingAuthUi');
+        if (landingAuthUi) {
+            landingAuthUi.classList.remove('hidden');
+            landingAuthUi.style.setProperty('display', 'flex', 'important');
+        }
+        
+        const landingUserName = document.getElementById('landingUserName');
+        if (landingUserName) landingUserName.textContent = `Welcome, ${currentUserName}`;
+        
+        const landingLogoutBtn = document.getElementById('landingLogoutBtn');
+        if (landingLogoutBtn) {
+            landingLogoutBtn.addEventListener('click', () => {
+                localStorage.clear();
+                window.location.href = "index.html?home=true";
+            });
+        }
         
         // Start timer
         const timerEl = document.getElementById('navTimer');

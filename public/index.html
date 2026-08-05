@@ -23,7 +23,17 @@
     <!-- Landing View -->
     <div id="landingView" class="books-theme hidden" style="flex: 1; overflow-y: auto; width: 100%;">
         <div class="container" style="padding-top: 4rem;">
-            <header class="main-header">
+            <header class="main-header" style="position: relative;">
+                <div style="position: absolute; top: -2rem; right: 0; display: flex; gap: 10px; align-items: center;">
+                    <div id="landingAuthUi" class="hidden" style="display: flex; gap: 10px; align-items: center;">
+                        <span id="landingUserName" style="color: var(--books-text); font-weight: bold;"></span>
+                        <button id="landingLogoutBtn" class="btn secondary-btn small-btn">Logout</button>
+                    </div>
+                    <div id="landingGuestUi" style="display: flex; gap: 10px;">
+                        <a href="login.html" class="btn white-btn small-btn" style="text-decoration: none;">Login</a>
+                        <a href="register.html" class="btn primary-btn small-btn" style="text-decoration: none;">Register</a>
+                    </div>
+                </div>
                 <h1 class="books-logo">Word<span>Lens</span></h1>
                 <p class="books-subtitle">Read PDFs and instantly definition or save unknown vocabulary.</p>
             </header>
