@@ -96,11 +96,12 @@ if (pdfViewer) {
 
     const landingView = document.getElementById('landingView');
     const readerView = document.getElementById('readerView');
+    const forceMain = urlParams.get('main') === 'true';
 
-    if (pdfUrl) {
+    if (pdfUrl || forceMain) {
         if (landingView) landingView.classList.add('hidden');
         if (readerView) readerView.style.display = 'flex';
-        loadPDF(pdfUrl, currentPdfId);
+        if (pdfUrl) loadPDF(pdfUrl, currentPdfId);
     } else {
         if (landingView) landingView.classList.remove('hidden');
         if (readerView) readerView.style.display = 'none';
