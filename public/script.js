@@ -353,7 +353,8 @@ if (pdfViewer) {
                 playBtn.style.cursor = 'pointer';
                 
                 playBtn.onclick = () => {
-                    const audioUrl = resolveApiUrl(`/tts/${encodeURIComponent(word)}?lang=en`);
+                    // Fetch directly from Google Translate API to bypass Netlify cloud blocks
+                    const audioUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=en&q=${encodeURIComponent(word)}`;
                     const audio = new Audio(audioUrl);
                     audio.play().catch(err => {
                         console.error("Audio play failed:", err);
@@ -430,8 +431,8 @@ if (pdfViewer) {
                 playTransBtn.classList.remove('hidden');
                 
                 playTransBtn.onclick = () => {
-                    // Use our TTS proxy with the target language code and translated text
-                    const audioUrl = resolveApiUrl(`/tts/${encodeURIComponent(data.translation)}?lang=${data.lang_code}`);
+                    // Fetch directly from Google Translate API to bypass Netlify cloud blocks
+                    const audioUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${data.lang_code}&q=${encodeURIComponent(data.translation)}`;
                     const audio = new Audio(audioUrl);
                     audio.play().catch(err => {
                         console.error("Translation audio play failed:", err);
