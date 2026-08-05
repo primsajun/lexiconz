@@ -545,6 +545,9 @@ if (pdfViewer) {
         const nameEl = document.getElementById('navUserName');
         if (nameEl) nameEl.textContent = `Hi, ${currentUserName}`;
         
+        const navMainBtn = document.getElementById('navMainBtn');
+        if (navMainBtn) navMainBtn.classList.remove('hidden');
+        
         const landingGuestUi = document.getElementById('landingGuestUi');
         if (landingGuestUi) landingGuestUi.classList.add('hidden');
         
