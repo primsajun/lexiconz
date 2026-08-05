@@ -306,12 +306,14 @@ if (pdfViewer) {
                 let x = e.pageX;
                 let y = e.pageY;
                 
-                if (e.type === 'touchend' && e.changedTouches && e.changedTouches.length > 0) {
-                    x = e.changedTouches[0].pageX;
-                    y = e.changedTouches[0].pageY;
-                }
-                
-                if (!x || !y) {
+                if (e.type === 'touchend') {
+                    // Mobile touch selection handle coordinates are unreliable.
+                    // Always use bounding rect on touch to get accurate placement.
+                    const rect = selection.getRangeAt(0).getBoundingClientRect();
+                    x = rect.left + window.scrollX;
+                    // Place it *below* the word to avoid overlapping the native iOS/Android "Copy" popup
+                    y = rect.bottom + window.scrollY + 10;
+                } else if (!x || !y) {
                     const rect = selection.getRangeAt(0).getBoundingClientRect();
                     x = rect.left + window.scrollX;
                     y = rect.top + window.scrollY;
@@ -381,31 +383,47 @@ if (pdfViewer) {
         popup.classList.add('hidden');
     });
 
-    // Make Popup Draggable
+    // Make Popup Draggable (Mouse + Touch)
     const popupHeader = document.querySelector('.popup-header');
     let isDragging = false;
     let dragOffsetX, dragOffsetY;
 
     popupHeader.style.cursor = 'move';
 
-    popupHeader.addEventListener('mousedown', (e) => {
-        // Don't drag if clicking buttons
+    function startDrag(e) {
         if(e.target.tagName === 'BUTTON') return;
-        
         isDragging = true;
-        dragOffsetX = e.clientX - popup.getBoundingClientRect().left;
-        dragOffsetY = e.clientY - popup.getBoundingClientRect().top;
-    });
+        
+        let clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        let clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        
+        dragOffsetX = clientX - popup.getBoundingClientRect().left;
+        dragOffsetY = clientY - popup.getBoundingClientRect().top;
+        
+        if (e.type === 'touchstart') e.preventDefault(); // Prevent scrolling while dragging header
+    }
 
-    document.addEventListener('mousemove', (e) => {
+    function doDrag(e) {
         if (!isDragging) return;
-        popup.style.left = `${e.clientX - dragOffsetX}px`;
-        popup.style.top = `${e.clientY - dragOffsetY}px`;
-    });
+        let clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        let clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        
+        popup.style.left = `${clientX - dragOffsetX}px`;
+        popup.style.top = `${clientY - dragOffsetY}px`;
+    }
 
-    document.addEventListener('mouseup', () => {
+    function stopDrag() {
         isDragging = false;
-    });
+    }
+
+    popupHeader.addEventListener('mousedown', startDrag);
+    popupHeader.addEventListener('touchstart', startDrag, {passive: false});
+
+    document.addEventListener('mousemove', doDrag);
+    document.addEventListener('touchmove', doDrag, {passive: false});
+
+    document.addEventListener('mouseup', stopDrag);
+    document.addEventListener('touchend', stopDrag);
 
     // Translation
     document.getElementById('translateBtn').addEventListener('click', async () => {
