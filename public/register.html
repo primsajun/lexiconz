@@ -83,8 +83,9 @@
                 const data = await res.json();
                 
                 if (res.ok) {
-                    alert("Registration successful! Please login.");
-                    window.location.href = 'login.html';
+                    localStorage.removeItem('lastPdfUrl');
+                    localStorage.removeItem('lastPdfId');
+                    window.location.href = 'index.html?home=true';
                 } else {
                     errorMsg.textContent = data.detail || "Registration failed";
                 }
