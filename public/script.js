@@ -353,13 +353,11 @@ if (pdfViewer) {
                 playBtn.style.cursor = 'pointer';
                 
                 playBtn.onclick = () => {
-                    // Fetch directly from Google Translate API to bypass Netlify cloud blocks
-                    const audioUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=en&q=${encodeURIComponent(word)}`;
-                    const audio = new Audio(audioUrl);
-                    audio.play().catch(err => {
-                        console.error("Audio play failed:", err);
-                        alert("Could not play the audio file.");
-                    });
+                    // Use native browser Text-to-Speech to avoid all network blocks and CORS issues
+                    window.speechSynthesis.cancel(); // Stop any currently playing audio
+                    const utterance = new SpeechSynthesisUtterance(word);
+                    utterance.lang = 'en-US';
+                    window.speechSynthesis.speak(utterance);
                 };
             }
         } catch(e) {
@@ -431,13 +429,11 @@ if (pdfViewer) {
                 playTransBtn.classList.remove('hidden');
                 
                 playTransBtn.onclick = () => {
-                    // Fetch directly from Google Translate API to bypass Netlify cloud blocks
-                    const audioUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${data.lang_code}&q=${encodeURIComponent(data.translation)}`;
-                    const audio = new Audio(audioUrl);
-                    audio.play().catch(err => {
-                        console.error("Translation audio play failed:", err);
-                        alert("Could not play the translated audio file.");
-                    });
+                    // Use native browser Text-to-Speech
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(data.translation);
+                    utterance.lang = data.lang_code; 
+                    window.speechSynthesis.speak(utterance);
                 };
             } else {
                 document.getElementById('translationResult').textContent = "Translation failed.";
