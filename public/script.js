@@ -292,18 +292,36 @@ if (pdfViewer) {
     let currentWord = "";
     
     textLayerDiv.addEventListener('mouseup', handleTextSelection);
+    textLayerDiv.addEventListener('touchend', handleTextSelection);
     
     function handleTextSelection(e) {
-        const selection = window.getSelection();
-        const text = selection.toString().trim();
-        
-        if (text && text.split(/\s+/).length === 1 && /^[a-zA-Z]+$/.test(text)) {
-            // It's a single word
-            currentWord = text;
-            showPopup(e.pageX, e.pageY, text);
-        } else {
-            popup.classList.add('hidden');
-        }
+        setTimeout(() => { // slight delay ensures mobile selection is registered
+            const selection = window.getSelection();
+            const text = selection.toString().trim();
+            
+            if (text && text.split(/\s+/).length === 1 && /^[a-zA-Z]+$/.test(text)) {
+                // It's a single word
+                currentWord = text;
+                
+                let x = e.pageX;
+                let y = e.pageY;
+                
+                if (e.type === 'touchend' && e.changedTouches && e.changedTouches.length > 0) {
+                    x = e.changedTouches[0].pageX;
+                    y = e.changedTouches[0].pageY;
+                }
+                
+                if (!x || !y) {
+                    const rect = selection.getRangeAt(0).getBoundingClientRect();
+                    x = rect.left + window.scrollX;
+                    y = rect.top + window.scrollY;
+                }
+                
+                showPopup(x, y, text);
+            } else {
+                popup.classList.add('hidden');
+            }
+        }, 150);
     }
 
     async function showPopup(x, y, word) {
