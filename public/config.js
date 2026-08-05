@@ -1,5 +1,5 @@
 (function () {
-    const configuredBase = window.__Lexicona_API_BASE__;
+    const configuredBase = window.__Lexiconz_API_BASE__;
     const metaBase = document.querySelector('meta[name="api-base"]')?.content;
     let apiBase = configuredBase || metaBase || "";
 
@@ -12,16 +12,16 @@
         }
     }
 
-    window.__Lexicona_API_BASE__ = apiBase.replace(/\/$/, "");
+    window.__Lexiconz_API_BASE__ = apiBase.replace(/\/$/, "");
 
-    window.LexiconaResolveUrl = function (url) {
+    window.LexiconzResolveUrl = function (url) {
         if (!url) return url;
         if (/^https?:\/\//i.test(url)) return url;
 
         if (url.startsWith("/")) {
-            if (window.__Lexicona_API_BASE__.startsWith("http")) {
+            if (window.__Lexiconz_API_BASE__.startsWith("http")) {
                 try {
-                    const base = new URL(window.__Lexicona_API_BASE__);
+                    const base = new URL(window.__Lexiconz_API_BASE__);
                     return `${base.origin}${url}`;
                 } catch (err) {
                     return url;

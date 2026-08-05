@@ -1,21 +1,21 @@
-# Lexicona - Project Explanation & Interview Guide
+# Lexiconz - Project Explanation & Interview Guide
 
-This document is designed to help you explain the **Lexicona** project in an interview setting. It breaks down the purpose, the technology stack, the architecture, and the specific challenges solved during development.
+This document is designed to help you explain the **Lexiconz** project in an interview setting. It breaks down the purpose, the technology stack, the architecture, and the specific challenges solved during development.
 
 ---
 
 ## 1. Project Overview
 
 ### **Q: Can you tell me about the project you built?**
-**A:** I built **Lexicona**, an intelligent PDF reading web application designed for language learners and avid readers. 
-The core problem it solves is the friction of encountering unknown words while reading. Instead of switching tabs to Google a word or use a separate dictionary app, Lexicona allows users to simply click or highlight any word directly inside the PDF. It instantly pops up the definition, phonetic pronunciation, and audio playback. Users can also translate the word into multiple languages and save it to their personal "Vocabulary Library" for later review. It also tracks reading history so you can pick up exactly where you left off.
+**A:** I built **Lexiconz**, an intelligent PDF reading web application designed for language learners and avid readers. 
+The core problem it solves is the friction of encountering unknown words while reading. Instead of switching tabs to Google a word or use a separate dictionary app, Lexiconz allows users to simply click or highlight any word directly inside the PDF. It instantly pops up the definition, phonetic pronunciation, and audio playback. Users can also translate the word into multiple languages and save it to their personal "Vocabulary Library" for later review. It also tracks reading history so you can pick up exactly where you left off.
 
 ---
 
 ## 2. Technology Stack
 
 ### **Q: What technology stack did you use and why?**
-**A:** I built Lexicona using a modern, lightweight, and highly performant stack:
+**A:** I built Lexiconz using a modern, lightweight, and highly performant stack:
 
 #### **Frontend (Client-Side)**
 *   **Vanilla HTML, CSS, JavaScript**: I specifically chose not to use heavy frameworks like React or Angular because the core requirement was raw performance for rendering large PDFs and handling fast text-selection events.
@@ -48,7 +48,7 @@ The core problem it solves is the friction of encountering unknown words while r
 *   **Backend Sync**: For logged-in users, the frontend debounces a sync request (using `setTimeout`) every time they turn a page, quietly saving their exact position to the SQLite database in the background.
 
 ### **Q: How does the Progressive Web App (PWA) functionality work?**
-**A:** I designed Lexicona to be installable like a native app. 
+**A:** I designed Lexiconz to be installable like a native app. 
 I created custom app icons (`192x192` and `512x512`), linked them in a `manifest.json` file, and injected metadata into the HTML heads. I also implemented a **Service Worker** (`sw.js`) that runs in the background. Because of these configurations, mobile browsers (like Chrome and Safari) and desktop browsers will prompt the user to "Add to Home Screen" or "Install App".
 
 ---

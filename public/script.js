@@ -1,4 +1,4 @@
-const API_BASE = window.__Lexicona_API_BASE__ || "/api";
+const API_BASE = window.__Lexiconz_API_BASE__ || "/api";
 let currentPdfId = "";
 let currentPdfText = ""; // For basic context to AI
 
