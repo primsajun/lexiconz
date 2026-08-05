@@ -691,3 +691,23 @@ body.reader-layout {
 }
 
 .hidden { display: none !important; }
+
+/* Mobile Responsiveness for Dictionary Popup */
+@media (max-width: 768px) {
+    .popup {
+        position: fixed !important;
+        bottom: 0 !important;
+        top: auto !important;
+        left: 0 !important;
+        width: 100% !important;
+        border-radius: 20px 20px 0 0 !important;
+        transform: none !important;
+        margin: 0 !important;
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.5) !important;
+        max-height: 50vh;
+        overflow-y: auto;
+    }
+    .popup-header {
+        cursor: default !important;
+    }
+}
