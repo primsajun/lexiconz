@@ -429,11 +429,13 @@ if (pdfViewer) {
                 playTransBtn.classList.remove('hidden');
                 
                 playTransBtn.onclick = () => {
-                    // Use native browser Text-to-Speech
+                    // Use Google Translate TTS directly (meta no-referrer bypasses blocks)
                     window.speechSynthesis.cancel();
-                    const utterance = new SpeechSynthesisUtterance(data.translation);
-                    utterance.lang = data.lang_code; 
-                    window.speechSynthesis.speak(utterance);
+                    const audioUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${data.lang_code}&q=${encodeURIComponent(data.translation)}`;
+                    const audio = new Audio(audioUrl);
+                    audio.play().catch(err => {
+                        console.error("Translation audio play failed:", err);
+                    });
                 };
             } else {
                 document.getElementById('translationResult').textContent = "Translation failed.";
