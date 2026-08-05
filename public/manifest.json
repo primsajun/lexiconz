@@ -1,6 +1,6 @@
 {
-  "name": "WordLens",
-  "short_name": "WordLens",
+  "name": "Lexicona",
+  "short_name": "Lexicona",
   "description": "Read PDFs and instantly translate or save unknown vocabulary.",
   "start_url": "/index.html",
   "display": "standalone",

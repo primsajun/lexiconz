@@ -1,4 +1,4 @@
-const CACHE_NAME = 'wordlens-v1';
+const CACHE_NAME = 'Lexicona-v1';
 
 self.addEventListener('install', (event) => {
     // Skip waiting forces the waiting service worker to become the active service worker.
