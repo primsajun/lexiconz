@@ -2,7 +2,7 @@
 
 This repo can be deployed to Vercel as a static frontend plus a Python serverless API.
 
-## What Vercel should use
+## What Vercel should use 
 
 - Framework preset: `Other`
 - Build command: leave empty
