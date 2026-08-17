@@ -235,6 +235,18 @@ app.delete('/api/vocabulary/:id', async (req, res) => {
     res.json({ status: "success" });
 });
 
+// Ping endpoint for cron jobs (keeps Supabase active)
+app.get('/api/ping', async (req, res) => {
+    try {
+        // Perform a lightweight query to Supabase to keep the database awake
+        const { error } = await supabase.from('reading_history').select('id').limit(1);
+        if (error) throw error;
+        res.json({ status: "success", message: "Supabase is active!" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Start Server (only if not running in serverless environment)
 if (process.env.NODE_ENV !== 'production' && !process.env.NETLIFY) {
     app.listen(port, () => {
