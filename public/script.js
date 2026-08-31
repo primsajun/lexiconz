@@ -563,7 +563,13 @@ if (pdfViewer) {
         
         const landingLogoutBtn = document.getElementById('landingLogoutBtn');
         if (landingLogoutBtn) {
-            landingLogoutBtn.addEventListener('click', () => {
+            landingLogoutBtn.addEventListener('click', async () => {
+                try {
+                    const res = await fetch('/api/config');
+                    const config = await res.json();
+                    const sb = supabase.createClient(config.supabase_url, config.supabase_key);
+                    await sb.auth.signOut();
+                } catch(e) {}
                 localStorage.clear();
                 window.location.href = "index.html?home=true";
             });
@@ -584,12 +590,18 @@ if (pdfViewer) {
         // Logout
         const logoutBtn = document.getElementById('navLogoutBtn');
         if (logoutBtn) {
-            logoutBtn.addEventListener('click', () => {
+            logoutBtn.addEventListener('click', async () => {
+                try {
+                    const res = await fetch('/api/config');
+                    const config = await res.json();
+                    const sb = supabase.createClient(config.supabase_url, config.supabase_key);
+                    await sb.auth.signOut();
+                } catch(e) {}
                 localStorage.removeItem('user_id');
                 localStorage.removeItem('user_name');
                 localStorage.removeItem('auth_token');
                 localStorage.removeItem('login_time');
-                window.location.reload();
+                window.location.href = "index.html?home=true";
             });
         }
     }
