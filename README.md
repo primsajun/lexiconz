@@ -21,10 +21,6 @@
 ## 🏗 Architecture
 Lexiconz is built on a highly performant **Serverless Architecture**. The frontend is lightweight vanilla JavaScript, while the backend API routes run on **Netlify Serverless Functions**. This means the backend spins up instantly on demand, keeping costs low and performance high. Persistent data and user authentication are securely managed by **Supabase**.
 
-## 📸 Screenshots
-*(Add your screenshots here!)*
-* Example: `![Reader View](./public/assets/screenshot1.png)`
-* Example: `![Mobile Dictionary](./public/assets/screenshot2.png)`
 
 ## 🚀 Live Demo
 Experience the app live here: **[https://lexiconz.netlify.app](https://lexiconz.netlify.app)**
