@@ -342,12 +342,12 @@ if (pdfViewer) {
         
         // Fetch Dictionary Data
         try {
-            const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+            const res = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=en&dt=md&q=${encodeURIComponent(word)}`);
             let meaning = "No definition found.";
             if (res.ok) {
                 const data = await res.json();
-                if (data && data[0] && data[0].meanings && data[0].meanings[0].definitions[0]) {
-                    meaning = data[0].meanings[0].definitions[0].definition;
+                if (data && data[12] && data[12][0] && data[12][0][1] && data[12][0][1][0]) {
+                    meaning = data[12][0][1][0][0];
                 }
             }
             document.getElementById('popupMeaning').textContent = meaning;
