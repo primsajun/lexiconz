@@ -342,29 +342,30 @@ if (pdfViewer) {
         
         // Fetch Dictionary Data
         try {
-            const res = await fetch(resolveApiUrl(`/dictionary/${word}`));
-            const data = await res.json();
-            
-            if (data.error) {
-                document.getElementById('popupMeaning').textContent = "Definition not found.";
-            } else {
-                document.getElementById('popupMeaning').textContent = data.meaning || 'No definition found.';
-                
-                // Audio
-                const playBtn = document.getElementById('playAudioBtn');
-                playBtn.style.opacity = '1';
-                playBtn.style.cursor = 'pointer';
-                
-                playBtn.onclick = () => {
-                    // Use native browser Text-to-Speech to avoid all network blocks and CORS issues
-                    window.speechSynthesis.cancel(); // Stop any currently playing audio
-                    const utterance = new SpeechSynthesisUtterance(word);
-                    utterance.lang = 'en-US';
-                    window.speechSynthesis.speak(utterance);
-                };
+            const res = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+            let meaning = "No definition found.";
+            if (res.ok) {
+                const data = await res.json();
+                if (data && data[0] && data[0].meanings && data[0].meanings[0].definitions[0]) {
+                    meaning = data[0].meanings[0].definitions[0].definition;
+                }
             }
+            document.getElementById('popupMeaning').textContent = meaning;
+            
+            // Audio (Always enable TTS)
+            const playBtn = document.getElementById('playAudioBtn');
+            playBtn.style.opacity = '1';
+            playBtn.style.cursor = 'pointer';
+            
+            playBtn.onclick = () => {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(word);
+                utterance.lang = 'en-US';
+                window.speechSynthesis.speak(utterance);
+            };
         } catch(e) {
             console.error(e);
+            document.getElementById('popupMeaning').textContent = "Error loading definition.";
         }
     }
 
@@ -429,19 +430,21 @@ if (pdfViewer) {
     // Translation
     document.getElementById('translateBtn').addEventListener('click', async () => {
         const lang = document.getElementById('targetLanguage').value;
-        const formData = new URLSearchParams();
-        formData.append('word', currentWord);
-        formData.append('target_language', lang);
+        const targetLangCode = {
+            'Tamil': 'ta',
+            'Hindi': 'hi',
+            'French': 'fr',
+            'Spanish': 'es'
+        }[lang] || 'ta';
         
         try {
-            const res = await fetch(resolveApiUrl("/translate"), {
-                method: 'POST',
-                body: formData
-            });
+            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLangCode}&dt=t&q=${encodeURIComponent(currentWord)}`;
+            const res = await fetch(url);
             const data = await res.json();
             
-            if (data.translation) {
-                document.getElementById('translationResult').textContent = data.translation;
+            if (data && data[0] && data[0][0] && data[0][0][0]) {
+                const translation = data[0][0][0];
+                document.getElementById('translationResult').textContent = translation;
                 
                 // Show play button for translation
                 const playTransBtn = document.getElementById('playTranslatedAudioBtn');
@@ -450,7 +453,7 @@ if (pdfViewer) {
                 playTransBtn.onclick = () => {
                     // Use Google Translate TTS directly (meta no-referrer bypasses blocks)
                     window.speechSynthesis.cancel();
-                    const audioUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${data.lang_code}&q=${encodeURIComponent(data.translation)}`;
+                    const audioUrl = `https://translate.googleapis.com/translate_tts?ie=UTF-8&client=gtx&tl=${targetLangCode}&q=${encodeURIComponent(translation)}`;
                     const audio = new Audio(audioUrl);
                     audio.play().catch(err => {
                         console.error("Translation audio play failed:", err);
@@ -486,12 +489,13 @@ if (pdfViewer) {
                 btn.textContent = "Translating...";
                 
                 const lang = document.getElementById('targetLanguage').value;
-                const transData = new URLSearchParams();
-                transData.append('word', currentWord);
-                transData.append('target_language', lang);
-                const tRes = await fetch(resolveApiUrl('/translate'), { method: 'POST', body: transData });
+                const targetLangCode = { 'Tamil': 'ta', 'Hindi': 'hi', 'French': 'fr', 'Spanish': 'es' }[lang] || 'ta';
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLangCode}&dt=t&q=${encodeURIComponent(currentWord)}`;
+                const tRes = await fetch(url);
                 const tJson = await tRes.json();
-                translationResult = tJson.translation || "";
+                if (tJson && tJson[0] && tJson[0][0] && tJson[0][0][0]) {
+                    translationResult = tJson[0][0][0];
+                }
             } catch (e) {
                 console.error("Auto-translate failed", e);
             }
